@@ -1,16 +1,26 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	charmaps "github.com/A5TA/keyBindViewer/char_maps"
+	imagegen "github.com/A5TA/keyBindViewer/image_gen"
 	"github.com/MarinX/keylogger"
 )
 
 func main() {
+	//Create The images to be shown on the App
+	err := imagegen.Generate_key_images()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("KeyLogger Images generated successfully!")
+
 	// Create a new app and window using Fyne
 	a := app.New()
 	w := a.NewWindow("Keylogger App")
@@ -53,7 +63,7 @@ func startKeylogger(keyInput *widget.Label) {
 
 	events := kLogger.Read()
 	var shiftPressed = false //boolean for knowing if the shift key is being pressed to include special characters
-
+	var keyPressed = ""
 	for e := range events {
 		switch e.Type {
 		case keylogger.EvKey:
@@ -70,35 +80,40 @@ func startKeylogger(keyInput *widget.Label) {
 					//lets disable the boolean
 					shiftPressed = false
 				} else {
-					displayImage(e.KeyString(), shiftPressed)
+					keyPressed, err = displayImage(e.KeyString(), shiftPressed)
+
+					if err == nil {
+						// Display the pressed key (or special character) in the Fyne window
+						updateLabel(keyInput, keyPressed)
+					} else {
+						fmt.Println("Error Occured, " + err.Error())
+					}
 				}
 			}
-
-			// Display the pressed key (or special character) in the Fyne window
-			updateLabel(keyInput, e.KeyString())
 			break
 		}
 	}
 }
 
-func displayImage(key string, shiftPressed bool) {
+func displayImage(key string, shiftPressed bool) (string, error) {
 	if shiftPressed {
 		//This key needs to be converted to its special character
-		convertedKey, exists := charConvertMap[key]
+		convertedKey, exists := charmaps.CharConvertMap[key]
 
 		if exists {
 			fmt.Printf("the key %s is found, converting to %s\n", key, convertedKey)
 			key = convertedKey //continue with the rest of the image path lookup
 		}
 	}
-	imagePath, exists := imageMap[key]
+	imagePath, exists := charmaps.ImageMap[key]
 
 	if !exists {
 		fmt.Printf("the key %s cannot be found\n", key)
-		return
+		return "", errors.New("key is not found")
 	}
 
-	fmt.Println("[Output] Image for ", imagePath)
+	return imagePath, nil
+	// fmt.Println("[Output] Image for ", imagePath)
 }
 
 // Update the label with the pressed key or special character
